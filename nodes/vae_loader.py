@@ -5,6 +5,9 @@ from pathlib import Path
 import torch
 
 from ..utils.model_management import get_checkpoint_dir
+from ..utils.lazy_loader import LazyVAELoader
+from ..utils.timing import TimedLogger
+from ..utils.comfy_integration import create_comfy_vae
 
 # Import Wan2pt1VAEInterface
 try:
@@ -88,21 +91,22 @@ class TurboWanVAELoader:
 
     def load_vae(self, vae_name: str) -> Tuple:
         """
-        Load the VAE checkpoint and return Wan2pt1VAEInterface object.
+        Create a lazy loader for VAE checkpoint.
+
+        This returns a lazy loader that defers actual VAE loading until first use.
 
         Args:
             vae_name: Name of VAE checkpoint file
 
         Returns:
-            Tuple containing Wan2pt1VAEInterface object
+            Tuple containing lazy VAE loader
         """
         if not TURBODIFFUSION_AVAILABLE:
             raise RuntimeError("TurboDiffusion modules not available!")
 
-        print(f"\n{'='*60}")
-        print(f"Loading TurboWan VAE")
-        print(f"{'='*60}")
-        print(f"VAE: {vae_name}")
+        logger = TimedLogger("VAELoader")
+        logger.section(f"Preparing Lazy VAE Loader")
+        logger.log(f"VAE: {vae_name}")
 
         # Find VAE file
         vae_path = None
@@ -148,18 +152,44 @@ class TurboWanVAELoader:
                 f"{'='*60}\n"
             )
 
-        print(f"Loading VAE from: {vae_path}")
-
-        # Create Wan2pt1VAEInterface with the file path
-        # Note: Wan2pt1VAEInterface handles loading internally via easy_io
-        vae = Wan2pt1VAEInterface(vae_pth=str(vae_path))
-
-        print(f"VAE loaded successfully!")
-        print(f"Spatial compression factor: {vae.spatial_compression_factor}")
-        print(f"Temporal compression factor: {vae.temporal_compression_factor}")
+        logger.log(f"Path: {vae_path}")
+        logger.log(f"✓ Lazy loader created (VAE will load on first use)")
         print(f"{'='*60}\n")
 
-        return (vae,)
+        # Create lazy loader
+        lazy_loader = LazyVAELoader(
+            vae_path=vae_path,
+            vae_name=vae_name,
+            load_fn=lambda path: self._load_vae_impl(path, vae_name)
+        )
+
+        return (lazy_loader,)
+
+    @staticmethod
+    def _load_vae_impl(vae_path: Path, vae_name: str):
+        """
+        Internal method that performs the actual VAE loading.
+
+        This is called by LazyVAELoader when the VAE is first accessed.
+
+        Args:
+            vae_path: Path to VAE checkpoint
+            vae_name: Name of VAE file
+
+        Returns:
+            ComfyUI-integrated WanVAEWrapper
+        """
+        logger = TimedLogger("VAELoader")
+        logger.section("Loading VAE with ComfyUI Integration")
+
+        # Create ComfyUI-integrated VAE wrapper
+        vae_wrapper = create_comfy_vae(vae_path, vae_name)
+
+        logger.log(f"✓ VAE wrapper created successfully!")
+        logger.log(f"VAE starts on CPU for memory efficiency")
+        print(f"{'='*60}\n")
+
+        return vae_wrapper
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):

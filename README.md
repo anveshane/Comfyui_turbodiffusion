@@ -157,10 +157,18 @@ With SLA attention on RTX 3090:
 3. **Boundary** (default 0.9): Switches at 90% of sampling (e.g., step 3.6 out of 4)
 
 ### Memory Management
-- Models start on CPU
-- Only one model on GPU at a time
-- Automatic offloading after sampling stage
-- VAE/text encoder loaded/unloaded as needed
+
+**ComfyUI Integration:**
+- VAE wrapped with ComfyUI-compatible device management
+- Automatic loading/offloading integrated with ComfyUI's model management system
+- Calls `comfy.model_management.unload_all_models()` before VAE encoding
+- VAE automatically moves to GPU for encoding/decoding, then returns to CPU
+
+**Manual Management:**
+- Diffusion models start on CPU
+- Only one diffusion model on GPU at a time during sampling
+- Automatic offloading after each sampling stage
+- Text embeddings kept on CPU until needed for conditioning
 
 ## Troubleshooting
 

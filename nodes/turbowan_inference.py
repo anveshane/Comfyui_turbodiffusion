@@ -14,6 +14,9 @@ from typing import Tuple
 
 import comfy.model_management
 
+# Import timing utilities
+from ..utils.timing import TimedLogger
+
 # Import from vendored TurboDiffusion code
 try:
     from ..turbodiffusion_vendor.rcm.datasets.utils import VIDEO_RES_SIZE_INFO
@@ -125,17 +128,38 @@ class TurboDiffusionI2VSampler:
         device = comfy.model_management.get_torch_device()
         dtype = torch.bfloat16
 
-        print(f"\n{'='*60}")
-        print(f"TurboDiffusion I2V Inference")
-        print(f"{'='*60}")
-        print(f"Frames: {num_frames}, Steps: {num_steps}, Resolution: {resolution} {aspect_ratio}")
-        print(f"Boundary: {boundary}, Sigma: {sigma_max}, Seed: {seed}")
+        # Initialize timed logger
+        logger = TimedLogger("I2V-Inference")
+        logger.section("TurboDiffusion I2V Inference")
+
+        # Log GPU information
+        logger.log(f"Device: {device}")
+        if torch.cuda.is_available():
+            gpu_count = torch.cuda.device_count()
+            logger.log(f"CUDA available: Yes ({gpu_count} GPU(s) detected)")
+            for i in range(gpu_count):
+                gpu_name = torch.cuda.get_device_name(i)
+                total_memory_gb = torch.cuda.get_device_properties(i).total_memory / (1024**3)
+                logger.log(f"  GPU {i}: {gpu_name} - {total_memory_gb:.2f}GB total VRAM")
+
+            # Log current VRAM state
+            current_device = device if isinstance(device, int) else 0
+            allocated_gb = torch.cuda.memory_allocated(current_device) / (1024**3)
+            reserved_gb = torch.cuda.memory_reserved(current_device) / (1024**3)
+            total_gb = torch.cuda.get_device_properties(current_device).total_memory / (1024**3)
+            free_gb = total_gb - allocated_gb
+            logger.log(f"VRAM at start: {allocated_gb:.2f}GB used, {free_gb:.2f}GB free (of {total_gb:.2f}GB total)")
+        else:
+            logger.log(f"CUDA available: No (running on CPU)")
+
+        logger.log(f"Frames: {num_frames}, Steps: {num_steps}, Resolution: {resolution} {aspect_ratio}")
+        logger.log(f"Boundary: {boundary}, Sigma: {sigma_max}, Seed: {seed}")
 
         # 1. Extract text embedding from conditioning
-        print("Extracting text embedding from conditioning...")
-        print(f"Conditioning type: {type(conditioning)}")
-        print(f"Conditioning[0] type: {type(conditioning[0])}")
-        print(f"Conditioning[0][0] type: {type(conditioning[0][0])}")
+        logger.log("Extracting text embedding from conditioning...")
+        logger.log(f"Conditioning type: {type(conditioning)}")
+        logger.log(f"Conditioning[0] type: {type(conditioning[0])}")
+        logger.log(f"Conditioning[0][0] type: {type(conditioning[0][0])}")
 
         # ComfyUI CONDITIONING format is: [[cond_tensor, extra_dict]]
         # where cond_tensor is the text embedding (B, L, D)
@@ -154,16 +178,16 @@ class TurboDiffusionI2VSampler:
                         text_emb = val
                         break
 
-        print(f"Text embedding shape: {text_emb.shape}")
+        logger.log(f"Text embedding shape: {text_emb.shape}")
         # Keep text_emb on CPU for now to save VRAM
         text_emb_cpu = text_emb.cpu() if text_emb.device.type == "cuda" else text_emb
 
-        # 2. Get VAE encoder (it's a Wan2pt1VAEInterface)
-        print("Preparing VAE...")
+        # 2. Get VAE encoder (it's a Wan2pt1VAEInterface or lazy loader)
+        logger.log("Preparing VAE...")
         tokenizer = vae
 
         # 3. Preprocess image
-        print("Preprocessing input image...")
+        logger.log("Preprocessing input image...")
         # Convert ComfyUI IMAGE format (B, H, W, C) to PIL
         image_np = (image[0].cpu().numpy() * 255).astype(np.uint8)
         input_image = Image.fromarray(image_np)
@@ -176,12 +200,12 @@ class TurboDiffusionI2VSampler:
 
         # Memory estimation and warning
         frame_tensor_gb = (num_frames * 3 * h * w * 4) / (1024**3)  # float32 = 4 bytes
-        print(f"Target resolution: {w}x{h}, Latent shape: {lat_t}x{lat_h}x{lat_w}")
-        print(f"Frame tensor size: ~{frame_tensor_gb:.2f}GB")
+        logger.log(f"Target resolution: {w}x{h}, Latent shape: {lat_t}x{lat_h}x{lat_w}")
+        logger.log(f"Frame tensor size: ~{frame_tensor_gb:.2f}GB")
 
         if frame_tensor_gb > 1.5:
-            print(f"⚠️  WARNING: Large frame tensor ({frame_tensor_gb:.2f}GB) may cause OOM!")
-            print(f"   Consider: resolution='480' (not '480p'), or fewer frames (e.g., 49 instead of {num_frames})")
+            logger.log(f"⚠️  WARNING: Large frame tensor ({frame_tensor_gb:.2f}GB) may cause OOM!")
+            logger.log(f"   Consider: resolution='480' (not '480p'), or fewer frames (e.g., 49 instead of {num_frames})")
 
         # Transform image
         image_transforms = T.Compose([
@@ -193,16 +217,16 @@ class TurboDiffusionI2VSampler:
         image_tensor = image_transforms(input_image).unsqueeze(0).to(device=device, dtype=torch.float32)
 
         # 4. Encode image with VAE
-        print("Encoding image with VAE...")
+        logger.log("Encoding image with VAE...")
 
         # Display VRAM usage before cleanup
         if torch.cuda.is_available():
             allocated_gb = torch.cuda.memory_allocated(device) / (1024**3)
             reserved_gb = torch.cuda.memory_reserved(device) / (1024**3)
-            print(f"VRAM before cleanup: {allocated_gb:.2f}GB allocated, {reserved_gb:.2f}GB reserved")
+            logger.log(f"VRAM before cleanup: {allocated_gb:.2f}GB allocated, {reserved_gb:.2f}GB reserved")
 
         # Aggressive cleanup before VAE encoding
-        print("Unloading all models from GPU...")
+        logger.log("Unloading all models from GPU...")
         comfy.model_management.unload_all_models()
         comfy.model_management.soft_empty_cache()
         torch.cuda.empty_cache()
@@ -210,42 +234,37 @@ class TurboDiffusionI2VSampler:
             torch.cuda.synchronize()
             allocated_gb = torch.cuda.memory_allocated(device) / (1024**3)
             reserved_gb = torch.cuda.memory_reserved(device) / (1024**3)
-            print(f"VRAM after cleanup: {allocated_gb:.2f}GB allocated, {reserved_gb:.2f}GB reserved")
+            logger.log(f"VRAM after cleanup: {allocated_gb:.2f}GB allocated, {reserved_gb:.2f}GB reserved")
 
-        # Move VAE to GPU for encoding
-        print("Loading VAE to GPU...")
-        tokenizer.model.model.to(device)
-
+        # Prepare frames for encoding (VAE wrapper handles device management)
         with torch.no_grad():
-            # Create zeros on CPU first to save GPU memory, then move
-            print(f"Creating frame tensor (1 real frame + {num_frames-1} zero frames)...")
+            # Create zeros on CPU first to save GPU memory
+            logger.log(f"Creating frame tensor (1 real frame + {num_frames-1} zero frames)...")
             zeros_cpu = torch.zeros(1, 3, num_frames - 1, h, w, dtype=torch.float32)
             frames_to_encode = torch.cat([
-                image_tensor.unsqueeze(2),
-                zeros_cpu.to(device)
-            ], dim=2)  # B, C, T, H, W
+                image_tensor.cpu().unsqueeze(2),
+                zeros_cpu
+            ], dim=2)  # B, C, T, H, W on CPU
 
-            # Free CPU tensor
+            # Free intermediate tensors
             del zeros_cpu
+            del image_tensor
 
-            print(f"Encoding {num_frames} frames at {w}x{h} resolution...")
+            logger.log(f"Encoding {num_frames} frames at {w}x{h} resolution...")
+            # VAE wrapper automatically moves to GPU, encodes, and returns to CPU
             encoded_latents = tokenizer.encode(frames_to_encode)
 
         # Clear intermediate tensors
-        del image_tensor
         del frames_to_encode
         torch.cuda.empty_cache()
 
-        # Move encoded latents to target dtype and device before offloading VAE
+        # Move encoded latents to target device and dtype
         encoded_latents = encoded_latents.to(device=device, dtype=dtype)
 
-        # Offload VAE from GPU
-        print("Offloading VAE from GPU...")
-        tokenizer.model.model.to("cpu")
-        torch.cuda.empty_cache()
+        logger.log("VAE encoding complete (VAE automatically offloaded to CPU)")
 
         # 5. Prepare conditioning
-        print("Preparing conditioning...")
+        logger.log("Preparing conditioning...")
         msk = torch.zeros(1, 4, lat_t, lat_h, lat_w, device=device, dtype=dtype)
         msk[:, :, 0, :, :] = 1.0
 
@@ -266,7 +285,7 @@ class TurboDiffusionI2VSampler:
         }
 
         # 6. Initialize noise
-        print(f"Initializing noise with seed {seed}...")
+        logger.log(f"Initializing noise with seed {seed}...")
         generator = torch.Generator(device=device)
         generator.manual_seed(seed)
 
@@ -279,24 +298,54 @@ class TurboDiffusionI2VSampler:
         )
 
         # 7. Run dual-expert rCM sampling
-        print("Running dual-expert rCM sampling...")
+        logger.log("Running dual-expert rCM sampling...")
 
         # Calculate boundary step
         boundary_step = int(num_steps * boundary)
-        print(f"Boundary at step {boundary_step}/{num_steps}")
+        logger.log(f"Boundary at step {boundary_step}/{num_steps}")
 
-        # Aggressive memory cleanup before loading models
+        # Aggressive memory cleanup before loading high noise model
+        logger.log("Aggressive VRAM cleanup before loading diffusion model...")
+
+        # Unload all ComfyUI models
+        comfy.model_management.unload_all_models()
+        comfy.model_management.soft_empty_cache()
+
+        # Clear any remaining CUDA memory
         torch.cuda.empty_cache()
         if torch.cuda.is_available():
             torch.cuda.synchronize()
 
-        # Move high noise model to device
-        print("Loading high noise model...")
+        # Force garbage collection
+        import gc
+        gc.collect()
+        torch.cuda.empty_cache()
+
+        # Log VRAM status
+        if torch.cuda.is_available():
+            current_device = device if isinstance(device, int) else 0
+            allocated_gb = torch.cuda.memory_allocated(current_device) / (1024**3)
+            reserved_gb = torch.cuda.memory_reserved(current_device) / (1024**3)
+            total_gb = torch.cuda.get_device_properties(current_device).total_memory / (1024**3)
+            free_gb = total_gb - reserved_gb
+            logger.log(f"VRAM before high noise model: {allocated_gb:.2f}GB allocated, {reserved_gb:.2f}GB reserved, {free_gb:.2f}GB free")
+
+        # Move high noise model to device (lazy loader will trigger loading here)
+        logger.log("Loading high noise model...")
         high_noise_model = high_noise_model.to(device)
+
+        # Log VRAM after model load
+        if torch.cuda.is_available():
+            current_device = device if isinstance(device, int) else 0
+            allocated_gb = torch.cuda.memory_allocated(current_device) / (1024**3)
+            reserved_gb = torch.cuda.memory_reserved(current_device) / (1024**3)
+            total_gb = torch.cuda.get_device_properties(current_device).total_memory / (1024**3)
+            free_gb = total_gb - reserved_gb
+            logger.log(f"VRAM after high noise model loaded: {allocated_gb:.2f}GB allocated, {reserved_gb:.2f}GB reserved, {free_gb:.2f}GB free")
 
         # Sample with high noise model (steps 0 → boundary)
         if boundary_step > 0:
-            print(f"Sampling with high noise model (steps 0-{boundary_step})...")
+            logger.log(f"Sampling with high noise model (steps 0-{boundary_step})...")
             with torch.no_grad():
                 x = rcm_sampler(
                     high_noise_model,
@@ -314,17 +363,43 @@ class TurboDiffusionI2VSampler:
             x = init_noise
 
         # Offload high noise model
-        print("Offloading high noise model...")
+        logger.log("Offloading high noise model...")
         high_noise_model = high_noise_model.cpu()
+
+        # Aggressive memory cleanup before loading low noise model
+        logger.log("Aggressive VRAM cleanup before loading low noise model...")
+        comfy.model_management.soft_empty_cache()
         torch.cuda.empty_cache()
 
-        # Move low noise model to device
-        print("Loading low noise model...")
+        import gc
+        gc.collect()
+        torch.cuda.empty_cache()
+
+        # Log VRAM status
+        if torch.cuda.is_available():
+            current_device = device if isinstance(device, int) else 0
+            allocated_gb = torch.cuda.memory_allocated(current_device) / (1024**3)
+            reserved_gb = torch.cuda.memory_reserved(current_device) / (1024**3)
+            total_gb = torch.cuda.get_device_properties(current_device).total_memory / (1024**3)
+            free_gb = total_gb - reserved_gb
+            logger.log(f"VRAM before low noise model: {allocated_gb:.2f}GB allocated, {reserved_gb:.2f}GB reserved, {free_gb:.2f}GB free")
+
+        # Move low noise model to device (lazy loader will trigger loading here)
+        logger.log("Loading low noise model...")
         low_noise_model = low_noise_model.to(device)
+
+        # Log VRAM after model load
+        if torch.cuda.is_available():
+            current_device = device if isinstance(device, int) else 0
+            allocated_gb = torch.cuda.memory_allocated(current_device) / (1024**3)
+            reserved_gb = torch.cuda.memory_reserved(current_device) / (1024**3)
+            total_gb = torch.cuda.get_device_properties(current_device).total_memory / (1024**3)
+            free_gb = total_gb - reserved_gb
+            logger.log(f"VRAM after low noise model loaded: {allocated_gb:.2f}GB allocated, {reserved_gb:.2f}GB reserved, {free_gb:.2f}GB free")
 
         # Sample with low noise model (steps boundary → num_steps)
         if boundary_step < num_steps:
-            print(f"Sampling with low noise model (steps {boundary_step}-{num_steps})...")
+            logger.log(f"Sampling with low noise model (steps {boundary_step}-{num_steps})...")
             with torch.no_grad():
                 x = rcm_sampler(
                     low_noise_model,
@@ -340,22 +415,18 @@ class TurboDiffusionI2VSampler:
                 )
 
         # Offload low noise model
-        print("Offloading low noise model...")
+        logger.log("Offloading low noise model...")
         low_noise_model = low_noise_model.cpu()
         torch.cuda.empty_cache()
 
         # 8. Decode latents with VAE
-        print("Decoding latents with VAE...")
-        # Move VAE to GPU for decoding
-        print("Loading VAE to GPU...")
-        tokenizer.model.model.to(device)
+        logger.log("Decoding latents with VAE...")
 
         with torch.no_grad():
+            # VAE wrapper automatically handles device management
             decoded_frames = tokenizer.decode(x)  # B, C, T, H, W
 
-        # Offload VAE from GPU
-        print("Offloading VAE from GPU...")
-        tokenizer.model.model.to("cpu")
+        logger.log("VAE decoding complete (VAE automatically offloaded to CPU)")
         torch.cuda.empty_cache()
 
         # 9. Convert to ComfyUI IMAGE format (B*T, H, W, C)
@@ -367,7 +438,8 @@ class TurboDiffusionI2VSampler:
         decoded_frames = (decoded_frames + 1.0) / 2.0
         decoded_frames = decoded_frames.clamp(0, 1)
 
-        print(f"Successfully generated {decoded_frames.shape[0]} frames!")
+        logger.log(f"✓ Successfully generated {decoded_frames.shape[0]} frames!")
+        logger.log(f"Total inference time: {logger.elapsed():.2f}s")
         print(f"{'='*60}\n")
 
         return (decoded_frames.cpu(),)
