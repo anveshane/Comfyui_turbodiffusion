@@ -11,9 +11,10 @@ authors = [
 keywords = ["comfyui", "turbodiffusion", "image-to-video", "video-generation", "diffusion"]
 
 dependencies = [
-    "torch>=2.7.0",
+    "torch>=2.0.0",
     "torchvision",
-    "turbodiffusion @ git+https://github.com/thu-ml/TurboDiffusion.git",
+    "triton; platform_system == 'Linux'",
+    "triton-windows; platform_system == 'Windows'",
     "einops",
     "Pillow>=10.0.0",
     "numpy>=1.24.0",
@@ -43,7 +44,7 @@ build-backend = "hatchling.build"
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["nodes", "utils"]
+packages = ["nodes", "utils", "turbodiffusion_vendor"]
 
 [tool.uv]
 dev-dependencies = [

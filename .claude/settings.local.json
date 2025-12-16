@@ -11,7 +11,20 @@
       "Bash(find:*)",
       "Bash(git init:*)",
       "Bash(git remote add:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git clone:*)",
+      "Bash(git -C /c/Users/Ganaraj/Documents/Projects/comfyui-turbodiffusion add nodes/turbowan_model_loader.py)",
+      "Bash(git -C /c/Users/Ganaraj/Documents/Projects/comfyui-turbodiffusion commit -m \"$(cat <<''EOF''\nMake TurboDiffusion import optional with helpful error handling\n\nChanges:\n- Wrapped TurboDiffusion imports in try/except block\n- Added TURBODIFFUSION_AVAILABLE flag\n- Display clear warning message if TurboDiffusion is not found during import\n- Check TURBODIFFUSION_AVAILABLE in load_model() before using TurboDiffusion functions\n- Provide helpful RuntimeError with installation instructions if not available\n\nThis allows the custom node to load in ComfyUI without TurboDiffusion installed,\nand provides clear guidance on how to install it when users try to use the node.\n\nFixes ModuleNotFoundError that prevented the custom node from loading in ComfyUI.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git -C /c/Users/Ganaraj/Documents/Projects/comfyui-turbodiffusion push origin main)",
+      "Bash(C:/Users/Ganaraj/Downloads/ComfyUI-Easy-Install/ComfyUI-Easy-Install/ComfyUI-Easy-Install/python_embeded/python.exe:*)",
+      "Bash(where:*)",
+      "Bash(nvcc:*)",
+      "Bash(echo:*)",
+      "Bash(CUDA_HOME=D:/Drivers C:/Users/Ganaraj/Downloads/ComfyUI-Easy-Install/ComfyUI-Easy-Install/ComfyUI-Easy-Install/python_embeded/python.exe:*)",
+      "Bash(../python_embeded/python.exe -c \"from turbodiffusion.inference.modify_model import select_model, replace_attention, replace_linear_norm; print(''SUCCESS: All imports work'')\")",
+      "Bash(python -c \"import sys; sys.path.insert(0, ''.''); from turbodiffusion_vendor.inference.modify_model import select_model, replace_attention, replace_linear_norm; print(''SUCCESS'')\")",
+      "Bash(../python_embeded/python.exe -c \"import sys; sys.path.insert(0, ''custom_nodes/comfyui-turbodiffusion''); from nodes.turbowan_model_loader import TurboWanModelLoader; print(''SUCCESS: TurboWanModelLoader imported'')\")",
+      "Bash(../python_embeded/python.exe -c \"import sys; sys.path.insert(0, ''custom_nodes''); import comfyui_turbodiffusion; print(''SUCCESS'')\")"
     ]
   }
 }

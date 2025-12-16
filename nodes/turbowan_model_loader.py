@@ -11,22 +11,21 @@ import folder_paths
 import comfy.sd
 import comfy.model_management
 
-# Try to import TurboDiffusion's official model loading
+# Import from vendored TurboDiffusion code (no external dependency needed!)
 try:
-    from turbodiffusion.inference.modify_model import create_model, select_model, replace_attention, replace_linear_norm
+    # First import the vendor package which adds itself to sys.path
+    from .. import turbodiffusion_vendor
+    # Now import from the vendored modules using their absolute paths within vendor dir
+    from inference.modify_model import select_model, replace_attention, replace_linear_norm
     TURBODIFFUSION_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     TURBODIFFUSION_AVAILABLE = False
     print("\n" + "="*60)
-    print("WARNING: TurboDiffusion not found!")
+    print("ERROR: Could not import vendored TurboDiffusion code!")
     print("="*60)
-    print("TurboWanModelLoader requires TurboDiffusion to be installed.")
-    print("\nTo install TurboDiffusion:")
-    print("  1. Open a terminal/command prompt")
-    print("  2. Activate ComfyUI's Python environment")
-    print("  3. Run: pip install git+https://github.com/thu-ml/TurboDiffusion.git")
-    print("\nOR install in ComfyUI's portable python:")
-    print("  python_embeded\\python.exe -m pip install git+https://github.com/thu-ml/TurboDiffusion.git")
+    print(f"Import error: {e}")
+    print("\nThis should not happen as TurboDiffusion code is vendored in the package.")
+    print("Please report this issue at: https://github.com/anveshane/Comfyui_turbodiffusion/issues")
     print("="*60 + "\n")
 
 
@@ -86,17 +85,10 @@ class TurboWanModelLoader:
         """
         if not TURBODIFFUSION_AVAILABLE:
             raise RuntimeError(
-                "TurboDiffusion is not installed!\n\n"
-                "TurboWanModelLoader requires TurboDiffusion to load quantized models.\n\n"
-                "To install TurboDiffusion in ComfyUI's Python environment:\n"
-                "  1. Open a terminal/command prompt\n"
-                "  2. Navigate to your ComfyUI directory\n"
-                "  3. Run one of these commands:\n\n"
-                "     For portable ComfyUI:\n"
-                "     python_embeded\\python.exe -m pip install git+https://github.com/thu-ml/TurboDiffusion.git\n\n"
-                "     For standard Python:\n"
-                "     pip install git+https://github.com/thu-ml/TurboDiffusion.git\n\n"
-                "  4. Restart ComfyUI\n"
+                "Could not import vendored TurboDiffusion code!\n\n"
+                "This should not happen as TurboDiffusion code is included in the package.\n"
+                "Please check that all files were installed correctly and report this issue at:\n"
+                "https://github.com/anveshane/Comfyui_turbodiffusion/issues\n"
             )
 
         model_path = folder_paths.get_full_path_or_raise("diffusion_models", model_name)
