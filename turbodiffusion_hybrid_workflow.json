@@ -1,0 +1,220 @@
+{
+  "last_node_id": 7,
+  "last_link_id": 9,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "TurboWanModelLoaderV2",
+      "pos": [50, 50],
+      "size": [350, 120],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [1]}],
+      "properties": {"Node name for S&R": "TurboWanModelLoaderV2"},
+      "widgets_values": [
+        "TurboWan2.2-I2V-A14B-high-720P-quant.pth",
+        "sagesla",
+        0.1
+      ],
+      "title": "Load High Noise Model"
+    },
+    {
+      "id": 2,
+      "type": "TurboWanModelLoaderV2",
+      "pos": [50, 220],
+      "size": [350, 120],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "outputs": [{"name": "MODEL", "type": "MODEL", "links": [2]}],
+      "properties": {"Node name for S&R": "TurboWanModelLoaderV2"},
+      "widgets_values": [
+        "TurboWan2.2-I2V-A14B-low-720P-quant.pth",
+        "sagesla",
+        0.1
+      ],
+      "title": "Load Low Noise Model"
+    },
+    {
+      "id": 3,
+      "type": "LoadImage",
+      "pos": [50, 390],
+      "size": [315, 314],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [3]},
+        {"name": "MASK", "type": "MASK", "links": null}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["example.png", "image"],
+      "title": "Load Start Image"
+    },
+    {
+      "id": 4,
+      "type": "TurboWanI2VPrepare",
+      "pos": [450, 50],
+      "size": [400, 450],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {"name": "start_image", "type": "IMAGE", "link": 3}
+      ],
+      "outputs": [
+        {"name": "CONDITIONING", "type": "CONDITIONING", "links": [4]},
+        {"name": "LATENT", "type": "LATENT", "links": [5]}
+      ],
+      "properties": {"Node name for S&R": "TurboWanI2VPrepare"},
+      "widgets_values": [
+        "nsfw_wan_umt5-xxl_fp8_scaled.safetensors",
+        "wan_2.1_vae.safetensors",
+        "smooth camera motion, cinematic, high quality",
+        "static, blurry, low quality, distorted",
+        1280,
+        720,
+        121
+      ],
+      "title": "Prepare I2V Conditioning"
+    },
+    {
+      "id": 5,
+      "type": "TurboWanDualExpertSampler",
+      "pos": [900, 50],
+      "size": [350, 350],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {"name": "high_noise_model", "type": "MODEL", "link": 1},
+        {"name": "low_noise_model", "type": "MODEL", "link": 2},
+        {"name": "latent", "type": "LATENT", "link": 5},
+        {"name": "conditioning", "type": "CONDITIONING", "link": 4}
+      ],
+      "outputs": [
+        {"name": "LATENT", "type": "LATENT", "links": [6]}
+      ],
+      "properties": {"Node name for S&R": "TurboWanDualExpertSampler"},
+      "widgets_values": [
+        4,
+        0.9,
+        42,
+        true,
+        200.0
+      ],
+      "title": "Dual-Expert Sampling (Memory Efficient)"
+    },
+    {
+      "id": 6,
+      "type": "VAEDecode",
+      "pos": [1300, 50],
+      "size": [210, 46],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {"name": "samples", "type": "LATENT", "link": 6},
+        {"name": "vae", "type": "VAE", "link": 7}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [8, 9]}
+      ],
+      "properties": {"Node name for S&R": "VAEDecode"},
+      "title": "Decode Latents"
+    },
+    {
+      "id": 7,
+      "type": "VAELoader",
+      "pos": [1300, 150],
+      "size": [315, 58],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "outputs": [
+        {"name": "VAE", "type": "VAE", "links": [7]}
+      ],
+      "properties": {"Node name for S&R": "VAELoader"},
+      "widgets_values": ["wan_2.1_vae.safetensors"],
+      "title": "Load VAE (for decode)"
+    },
+    {
+      "id": 8,
+      "type": "PreviewImage",
+      "pos": [1550, 50],
+      "size": [400, 500],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 8}
+      ],
+      "properties": {"Node name for S&R": "PreviewImage"},
+      "title": "Preview Frames"
+    },
+    {
+      "id": 9,
+      "type": "TurboDiffusionSaveVideo",
+      "pos": [1550, 600],
+      "size": [350, 220],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {"name": "frames", "type": "IMAGE", "link": 9}
+      ],
+      "properties": {"Node name for S&R": "TurboDiffusionSaveVideo"},
+      "widgets_values": ["turbodiffusion", 24, "mp4", 8, true],
+      "title": "Save Video"
+    }
+  ],
+  "links": [
+    [1, 1, 0, 5, 0, "MODEL"],
+    [2, 2, 0, 5, 1, "MODEL"],
+    [3, 3, 0, 4, 0, "IMAGE"],
+    [4, 4, 0, 5, 3, "CONDITIONING"],
+    [5, 4, 1, 5, 2, "LATENT"],
+    [6, 5, 0, 6, 0, "LATENT"],
+    [7, 7, 0, 6, 1, "VAE"],
+    [8, 6, 0, 8, 0, "IMAGE"],
+    [9, 6, 0, 9, 0, "IMAGE"]
+  ],
+  "groups": [
+    {
+      "title": "1. Load Models (Official)",
+      "bounding": [30, -20, 390, 380],
+      "color": "#3f789e",
+      "font_size": 24
+    },
+    {
+      "title": "2. Load & Prepare Input",
+      "bounding": [30, 370, 390, 370],
+      "color": "#b58b2a",
+      "font_size": 24
+    },
+    {
+      "title": "3. Prepare Conditioning",
+      "bounding": [430, -20, 440, 550],
+      "color": "#8a8a8a",
+      "font_size": 24
+    },
+    {
+      "title": "4. Sample (Memory Efficient)",
+      "bounding": [880, -20, 390, 420],
+      "color": "#a1309b",
+      "font_size": 24
+    },
+    {
+      "title": "5. Decode & Save",
+      "bounding": [1280, -20, 690, 870],
+      "color": "#3a8a3a",
+      "font_size": 24
+    }
+  ],
+  "config": {},
+  "extra": {
+    "description": "Hybrid workflow using official TurboDiffusion model loading with on-demand loading for memory efficiency. Models are loaded to GPU only when needed and unloaded immediately after."
+  },
+  "version": 0.4
+}

@@ -21,18 +21,24 @@ Repository: https://github.com/your-org/comfyui-turbodiffusion
 License: Apache 2.0
 """
 
-from .nodes.turbodiffusion_wrapper import TurboDiffusionI2VNode
+from .nodes.turbowan_model_loader_v2 import TurboWanModelLoaderV2
+from .nodes.turbowan_i2v_prepare import TurboWanI2VPrepare
+from .nodes.turbowan_sampler_v2 import TurboWanDualExpertSampler
 from .nodes.video_saver import TurboDiffusionSaveVideo
 
 # ComfyUI node registration
 NODE_CLASS_MAPPINGS = {
-    "TurboDiffusionI2V": TurboDiffusionI2VNode,
+    "TurboWanModelLoaderV2": TurboWanModelLoaderV2,
+    "TurboWanI2VPrepare": TurboWanI2VPrepare,
+    "TurboWanDualExpertSampler": TurboWanDualExpertSampler,
     "TurboDiffusionSaveVideo": TurboDiffusionSaveVideo,
 }
 
 # Display names for nodes in ComfyUI interface
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "TurboDiffusionI2V": "TurboDiffusion I2V (Official Wrapper)",
+    "TurboWanModelLoaderV2": "TurboWan Model Loader (Official)",
+    "TurboWanI2VPrepare": "TurboWan I2V Prepare",
+    "TurboWanDualExpertSampler": "TurboWan Dual-Expert Sampler",
     "TurboDiffusionSaveVideo": "Save Video",
 }
 
@@ -45,21 +51,23 @@ __author__ = "ComfyUI TurboDiffusion Contributors"
 __all__ = [
     "NODE_CLASS_MAPPINGS",
     "NODE_DISPLAY_NAME_MAPPINGS",
-    "TurboDiffusionI2VNode",
+    "TurboWanModelLoaderV2",
+    "TurboWanI2VPrepare",
+    "TurboWanDualExpertSampler",
     "TurboDiffusionSaveVideo",
 ]
 
 # Print initialization message
 print("\n" + "=" * 60)
-print("ComfyUI TurboDiffusion I2V Node (v3.0 - Official Wrapper)")
+print("ComfyUI TurboDiffusion I2V Node (v3.0 - Hybrid)")
 print("=" * 60)
 print(f"Version: {__version__}")
 print(f"Loaded {len(NODE_CLASS_MAPPINGS)} nodes:")
 for node_name, display_name in NODE_DISPLAY_NAME_MAPPINGS.items():
     print(f"  - {display_name} ({node_name})")
-print("\nThis version uses TurboDiffusion's official inference code:")
-print("  ✓ Automatic quantized model loading")
+print("\nHybrid approach:")
+print("  ✓ Official model loading with create_model()")
+print("  ✓ On-demand model loading (memory efficient)")
 print("  ✓ Optimized SageSLA attention")
-print("  ✓ Dual-expert sampling")
-print("  ✓ All official optimizations")
+print("  ✓ Modular workflow (4 nodes)")
 print("=" * 60 + "\n")
