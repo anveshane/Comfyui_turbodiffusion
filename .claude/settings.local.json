@@ -15,7 +15,9 @@
       "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: ComfyUI TurboDiffusion custom nodes\n\nThis is the current working implementation with custom model loader and dequantization.\n\nFeatures:\n- TurboWanModelLoader: Custom loader for quantized .pth models with block-wise int8 dequantization\n- TurboWanSampler: I2V conditioning preparation based on WanImageToVideo pattern\n- TurboDiffusionSaveVideo: Video export to MP4/GIF/WebM formats\n- Complete workflow using ComfyUI-native nodes (UNETLoader, CLIPLoader, VAELoader)\n\nModel support:\n- TurboWan2.2-I2V-A14B quantized models (high/low noise)\n- nsfw_wan_umt5-xxl_fp8_scaled text encoder\n- wan_2.1_vae VAE\n\nImplementation uses custom dequantization logic for int8 block-wise quantization.\nNext iteration may wrap official TurboDiffusion inference code instead.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(git branch:*)",
       "Bash(git push:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)",
+      "Bash(git rm:*)"
     ]
   }
 }
