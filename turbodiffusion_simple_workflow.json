@@ -1,0 +1,111 @@
+{
+  "last_node_id": 3,
+  "last_link_id": 3,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadImage",
+      "pos": [50, 50],
+      "size": [315, 314],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [1]},
+        {"name": "MASK", "type": "MASK", "links": null}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["example.png", "image"],
+      "title": "Load Start Image"
+    },
+    {
+      "id": 2,
+      "type": "TurboDiffusionI2V",
+      "pos": [450, 50],
+      "size": [400, 700],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {"name": "start_image", "type": "IMAGE", "link": 1}
+      ],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [2, 3]}
+      ],
+      "properties": {"Node name for S&R": "TurboDiffusionI2V"},
+      "widgets_values": [
+        "TurboWan2.2-I2V-A14B-high-720P-quant.pth",
+        "TurboWan2.2-I2V-A14B-low-720P-quant.pth",
+        "wan_2.1_vae.safetensors",
+        "nsfw_wan_umt5-xxl_fp8_scaled.safetensors",
+        "smooth camera motion, cinematic, high quality",
+        "static, blurry, low quality, distorted",
+        121,
+        4,
+        0.9,
+        42,
+        true,
+        "sagesla",
+        0.1
+      ],
+      "title": "TurboDiffusion I2V Generator"
+    },
+    {
+      "id": 3,
+      "type": "PreviewImage",
+      "pos": [900, 50],
+      "size": [400, 500],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 2}
+      ],
+      "properties": {"Node name for S&R": "PreviewImage"},
+      "title": "Preview Frames"
+    },
+    {
+      "id": 4,
+      "type": "TurboDiffusionSaveVideo",
+      "pos": [900, 600],
+      "size": [350, 220],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {"name": "frames", "type": "IMAGE", "link": 3}
+      ],
+      "properties": {"Node name for S&R": "TurboDiffusionSaveVideo"},
+      "widgets_values": ["turbodiffusion", 24, "mp4", 8, true],
+      "title": "Save Video"
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 0, "IMAGE"],
+    [2, 2, 0, 3, 0, "IMAGE"],
+    [3, 2, 0, 4, 0, "IMAGE"]
+  ],
+  "groups": [
+    {
+      "title": "1. Input",
+      "bounding": [30, -20, 360, 410],
+      "color": "#3f789e",
+      "font_size": 24
+    },
+    {
+      "title": "2. Generate with TurboDiffusion",
+      "bounding": [430, -20, 440, 780],
+      "color": "#a1309b",
+      "font_size": 24
+    },
+    {
+      "title": "3. Preview & Save",
+      "bounding": [880, -20, 520, 870],
+      "color": "#3a8a3a",
+      "font_size": 24
+    }
+  ],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}

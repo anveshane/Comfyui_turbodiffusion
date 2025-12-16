@@ -21,22 +21,19 @@ Repository: https://github.com/your-org/comfyui-turbodiffusion
 License: Apache 2.0
 """
 
-from .nodes.turbowan_sampler import TurboWanSampler
+from .nodes.turbodiffusion_wrapper import TurboDiffusionI2VNode
 from .nodes.video_saver import TurboDiffusionSaveVideo
-from .nodes.turbowan_model_loader import TurboWanModelLoader
 
 # ComfyUI node registration
 NODE_CLASS_MAPPINGS = {
-    "TurboWanSampler": TurboWanSampler,
+    "TurboDiffusionI2V": TurboDiffusionI2VNode,
     "TurboDiffusionSaveVideo": TurboDiffusionSaveVideo,
-    "TurboWanModelLoader": TurboWanModelLoader,
 }
 
 # Display names for nodes in ComfyUI interface
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "TurboWanSampler": "TurboWan I2V Sampler",
+    "TurboDiffusionI2V": "TurboDiffusion I2V (Official Wrapper)",
     "TurboDiffusionSaveVideo": "Save Video",
-    "TurboWanModelLoader": "TurboWan Model Loader (Quantized)",
 }
 
 # Web extensions (optional - for custom node UI)
@@ -48,24 +45,21 @@ __author__ = "ComfyUI TurboDiffusion Contributors"
 __all__ = [
     "NODE_CLASS_MAPPINGS",
     "NODE_DISPLAY_NAME_MAPPINGS",
-    "TurboWanSampler",
+    "TurboDiffusionI2VNode",
     "TurboDiffusionSaveVideo",
-    "TurboWanModelLoader",
 ]
 
 # Print initialization message
 print("\n" + "=" * 60)
-print("ComfyUI TurboDiffusion I2V Node (v2.0 - Native Integration)")
+print("ComfyUI TurboDiffusion I2V Node (v3.0 - Official Wrapper)")
 print("=" * 60)
 print(f"Version: {__version__}")
 print(f"Loaded {len(NODE_CLASS_MAPPINGS)} nodes:")
 for node_name, display_name in NODE_DISPLAY_NAME_MAPPINGS.items():
     print(f"  - {display_name} ({node_name})")
-print("\nUse with standard ComfyUI nodes:")
-print("  - UNETLoader (models in diffusion_models/)")
-print("  - CLIPLoader (umT5 text encoder)")
-print("  - VAELoader (Wan2.1 VAE)")
-print("  - CLIPTextEncode (positive/negative prompts)")
-print("  - ModelSamplingSD3 + KSamplerAdvanced (dual-expert sampling)")
-print("  - VAEDecode (decode to images)")
+print("\nThis version uses TurboDiffusion's official inference code:")
+print("  ✓ Automatic quantized model loading")
+print("  ✓ Optimized SageSLA attention")
+print("  ✓ Dual-expert sampling")
+print("  ✓ All official optimizations")
 print("=" * 60 + "\n")
