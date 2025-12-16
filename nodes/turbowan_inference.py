@@ -173,7 +173,14 @@ class TurboDiffusionI2VSampler:
         lat_w = w // tokenizer.spatial_compression_factor
         lat_t = tokenizer.get_latent_num_frames(num_frames)
 
+        # Memory estimation and warning
+        frame_tensor_gb = (num_frames * 3 * h * w * 4) / (1024**3)  # float32 = 4 bytes
         print(f"Target resolution: {w}x{h}, Latent shape: {lat_t}x{lat_h}x{lat_w}")
+        print(f"Frame tensor size: ~{frame_tensor_gb:.2f}GB")
+
+        if frame_tensor_gb > 1.5:
+            print(f"⚠️  WARNING: Large frame tensor ({frame_tensor_gb:.2f}GB) may cause OOM!")
+            print(f"   Consider: resolution='480' (not '480p'), or fewer frames (e.g., 49 instead of {num_frames})")
 
         # Transform image
         image_transforms = T.Compose([

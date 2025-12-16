@@ -94,9 +94,9 @@ Complete I2V inference with dual-expert sampling.
 - `conditioning`: Text conditioning from CLIPTextEncode
 - `vae`: VAE from VAELoader
 - `image`: Starting image
-- `num_frames`: Frames to generate (must be 8n+1, e.g., 77, 121)
+- `num_frames`: Frames to generate (must be 8n+1, e.g., 49, 77, 121)
 - `num_steps`: Sampling steps (1-4, recommended: 4)
-- `resolution`: 480p, 720p, or 1080p
+- `resolution`: "480", "480p", "512", "720", "720p" (see note below)
 - `aspect_ratio`: 16:9, 9:16, 4:3, 3:4, 1:1
 - `boundary`: Timestep for model switching (0.9 recommended)
 - `sigma_max`: Initial sigma for rCM (200 recommended)
@@ -105,6 +105,13 @@ Complete I2V inference with dual-expert sampling.
 
 **Outputs**:
 - `frames`: Generated video frames (B*T, H, W, C)
+
+**Resolution Note**:
+- `"480"`: 480×480 (1:1), 640×480 (4:3), etc. - **Lower VRAM**
+- `"480p"`: 640×640 (1:1), 832×480 (16:9), etc. - Higher VRAM
+- For low VRAM (8-12GB): Use `"480"` with 49 frames
+- For medium VRAM (16GB): Use `"480p"` with 77 frames or `"720p"` with 49 frames
+- For high VRAM (24GB+): Use `"720p"` with 77+ frames
 
 **How it works**:
 1. Extracts text embedding from conditioning
