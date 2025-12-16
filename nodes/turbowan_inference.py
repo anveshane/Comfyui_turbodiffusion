@@ -195,6 +195,12 @@ class TurboDiffusionI2VSampler:
         # 4. Encode image with VAE
         print("Encoding image with VAE...")
 
+        # Display VRAM usage before cleanup
+        if torch.cuda.is_available():
+            allocated_gb = torch.cuda.memory_allocated(device) / (1024**3)
+            reserved_gb = torch.cuda.memory_reserved(device) / (1024**3)
+            print(f"VRAM before cleanup: {allocated_gb:.2f}GB allocated, {reserved_gb:.2f}GB reserved")
+
         # Aggressive cleanup before VAE encoding
         print("Unloading all models from GPU...")
         comfy.model_management.unload_all_models()
@@ -202,6 +208,9 @@ class TurboDiffusionI2VSampler:
         torch.cuda.empty_cache()
         if torch.cuda.is_available():
             torch.cuda.synchronize()
+            allocated_gb = torch.cuda.memory_allocated(device) / (1024**3)
+            reserved_gb = torch.cuda.memory_reserved(device) / (1024**3)
+            print(f"VRAM after cleanup: {allocated_gb:.2f}GB allocated, {reserved_gb:.2f}GB reserved")
 
         # Move VAE to GPU for encoding
         print("Loading VAE to GPU...")
