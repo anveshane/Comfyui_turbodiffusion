@@ -48,7 +48,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
 WEB_DIRECTORY = "./web"
 
 # Version info
-__version__ = "0.2.0"
+__version__ = "0.1.0"
 __author__ = "ComfyUI TurboDiffusion Contributors"
 __all__ = [
     "NODE_CLASS_MAPPINGS",
@@ -62,7 +62,7 @@ __all__ = [
 
 # Print initialization message
 print("\n" + "=" * 60)
-print("ComfyUI TurboDiffusion I2V Node (v2.0 - Native Integration)")
+print("ComfyUI TurboDiffusion I2V Node")
 print("=" * 60)
 print(f"Version: {__version__}")
 print(f"Loaded {len(NODE_CLASS_MAPPINGS)} nodes:")

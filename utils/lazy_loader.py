@@ -82,9 +82,15 @@ class LazyModelLoader:
         # Ensure model is loaded
         self._ensure_loaded()
 
-        # Check if model is wrapped with CPU offloading
+        # Check if model is wrapped with an offloading wrapper (keeps weights on CPU)
         from ..utils.cpu_offload_wrapper import CPUOffloadWrapper
-        if isinstance(self._model, CPUOffloadWrapper):
+        try:
+            from ..utils.layerwise_gpu_offload_wrapper import LayerwiseGPUOffloadWrapper
+            offload_wrappers = (CPUOffloadWrapper, LayerwiseGPUOffloadWrapper)
+        except Exception:
+            offload_wrappers = (CPUOffloadWrapper,)
+
+        if isinstance(self._model, offload_wrappers):
             # Just update execution device, model stays on CPU
             self._model.to(device)
         else:

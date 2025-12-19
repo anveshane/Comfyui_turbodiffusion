@@ -27,12 +27,56 @@ except ImportError:
         x_q = torch.round(x_flat / x_scale).to(torch.int8)
         return x_q.reshape(x.shape), x_scale.squeeze()
 
-    def gemm_cuda(x_q, x_s, w_q, w_s, _, __, ___):
-        """Fallback int8 GEMM using PyTorch"""
-        # Dequantize and perform standard matmul
+    def gemm_cuda(x_q, x_s, w_q, w_s, y=None, *_, **__):
+        """
+        Fallback int8 GEMM using PyTorch.
+
+        The real extension has changed signatures over time; accept extra args.
+        Returns the output tensor (and does NOT require an out buffer).
+        """
+        # Very rough fallback: dequantize and matmul.
+        # NOTE: This is not a perfect replica of the CUDA kernel, but it is functional.
         x_fp = x_q.float() * x_s.unsqueeze(-1)
-        w_fp = w_q.float() * w_s.unsqueeze(-1)
+        # w_s is blockwise in our models; int8_linear below uses a better fallback.
+        w_fp = w_q.float()
         return torch.matmul(x_fp, w_fp.t())
+
+
+def _dequant_int8_weight_blockwise(
+    w_q: torch.Tensor,
+    w_s: torch.Tensor,
+    *,
+    block: int = 128,
+    dtype: torch.dtype,
+    device: torch.device,
+) -> torch.Tensor:
+    """
+    Dequantize int8 weights with blockwise scales.
+
+    w_q: [N, K] int8
+    w_s: [ceil(N/block), ceil(K/block)] float scales
+    """
+    assert w_q.dtype == torch.int8
+    N, K = w_q.shape
+    rb = (N + block - 1) // block
+    cb = (K + block - 1) // block
+
+    # Pad weights to multiples of block
+    pad_n = rb * block - N
+    pad_k = cb * block - K
+    if pad_n or pad_k:
+        w_qp = F.pad(w_q, (0, pad_k, 0, pad_n), value=0)
+    else:
+        w_qp = w_q
+
+    w_qp = w_qp.to(device=device)
+    s = w_s.to(device=device, dtype=torch.float32)
+    # Reshape into blocks: [rb, block, cb, block] -> [rb, cb, block, block]
+    w_blocks = w_qp.view(rb, block, cb, block).permute(0, 2, 1, 3).to(dtype)
+    w_blocks = w_blocks * s[:, :, None, None].to(dtype)
+    # Back to [rb*block, cb*block]
+    w_fp = w_blocks.permute(0, 2, 1, 3).contiguous().view(rb * block, cb * block)
+    return w_fp[:N, :K]
 
 
 def int8_quant(x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -78,8 +122,29 @@ def int8_linear(
     n = w_q.shape[0]
     y = torch.zeros(m, n, dtype=x.dtype, device=x.device)
 
+    # If the CUDA extension isn't available (or is incompatible), fall back to
+    # dequantizing weights and using a standard matmul/linear.
+    if not TURBO_CUDA_AVAILABLE:
+        w_fp = _dequant_int8_weight_blockwise(
+            w_q,
+            w_s,
+            block=128,
+            dtype=x.dtype if x.is_floating_point() else torch.float16,
+            device=x.device,
+        )
+        out = x.to(w_fp.dtype) @ w_fp.t()
+        return out.to(x.dtype).reshape(*shape[:-1], n)
+
     x_q, x_s = int8_quant(x)
-    gemm_cuda(x_q, x_s, w_q, w_s, y)
+    try:
+        out = gemm_cuda(x_q, x_s, w_q, w_s, y)
+    except TypeError:
+        # Some builds expect extra args; pad with Nones.
+        out = gemm_cuda(x_q, x_s, w_q, w_s, y, None, None)
+
+    # Some implementations return output; others write into `y`.
+    if isinstance(out, torch.Tensor):
+        y = out
     return y.reshape(*shape[:-1], n)
 
 def flatten_if_batched(*tensors):

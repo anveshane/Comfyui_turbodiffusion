@@ -223,7 +223,23 @@ def rope_apply(x, video_size: VideoSize, freqs):
     sin = torch.sin(freqs).to(torch.float32)
 
     # Apply the rotation
-    rotated = flash_apply_rotary_emb(x.to(torch.float32), cos, sin, interleaved=True, inplace=False)
+    if flash_apply_rotary_emb is not None:
+        rotated = flash_apply_rotary_emb(x.to(torch.float32), cos, sin, interleaved=True, inplace=False)
+    else:
+        # Fallback when flash-attn isn't installed
+        def rotate_half(t, interleaved=False):
+            if not interleaved:
+                t1, t2 = t.chunk(2, dim=-1)
+                return torch.cat((-t2, t1), dim=-1)
+            t1, t2 = t[..., ::2], t[..., 1::2]
+            return rearrange(torch.stack((-t2, t1), dim=-1), "... d two -> ... (d two)", two=2)
+
+        ro_dim = cos.shape[-1] * 2
+        cos_ = repeat(cos, "s d -> s 1 (d 2)")
+        sin_ = repeat(sin, "s d -> s 1 (d 2)")
+        x_f = x.to(torch.float32)
+        x_rot = x_f[..., :ro_dim] * cos_ + rotate_half(x_f[..., :ro_dim], interleaved=True) * sin_
+        rotated = torch.cat([x_rot, x_f[..., ro_dim:]], dim=-1)
 
     return rotated.to(x.dtype)
 
@@ -447,10 +463,10 @@ class WanAttentionBlock(nn.Module):
             video_size(VideoSize): Shape [T, H, W]
             freqs(Tensor): Rope freqs, shape [1024, C / num_heads / 2]
         """
-        assert e.dtype == torch.float32
-        with amp.autocast("cuda", dtype=torch.float32):
-            e = (self.modulation + e).chunk(6, dim=1)
-        assert e[0].dtype == torch.float32
+        # `e` may come in as bf16 when running quantized checkpoints / layerwise GPU offload.
+        # We do the modulation math in fp32 for stability rather than asserting fp32 inputs.
+        e = e.float()
+        e = (self.modulation.float() + e).chunk(6, dim=1)
 
         # self-attention
         y = self.self_attn((self.norm1(x).float() * (1 + e[1]) + e[0]).type_as(x), seq_lens, video_size, freqs)
@@ -499,10 +515,13 @@ class Head(nn.Module):
             x(Tensor): Shape [B, L1, C]
             e(Tensor): Shape [B, C]
         """
-        assert e.dtype == torch.float32
-        with amp.autocast("cuda", dtype=torch.float32):
-            e = (self.modulation + e.unsqueeze(1)).chunk(2, dim=1)
-            x = self.head(self.norm(x) * (1 + e[1]) + e[0])
+        # `e` may be bf16 in low-VRAM modes; do the modulation math in fp32.
+        e = e.float()
+        e = (self.modulation.float() + e.unsqueeze(1)).chunk(2, dim=1)
+        h = self.norm(x) * (1 + e[1]) + e[0]
+        # Match linear weight dtype (bf16 in quant/offload modes) to avoid matmul dtype errors.
+        h = h.to(dtype=self.head.weight.dtype)
+        x = self.head(h)
         return x
 
 
@@ -701,10 +720,13 @@ class WanModel(nn.Module):
         seq_lens = torch.tensor([u.size(0) for u in x_B_L_D], dtype=torch.long)
 
         # time embeddings
-        with amp.autocast("cuda", dtype=torch.float32):
-            e_B_D = self.time_embedding(sinusoidal_embedding_1d(self.freq_dim, t_B).float())
-            e0_B_6_D = self.time_projection(e_B_D).unflatten(1, (6, self.dim))
-            assert e_B_D.dtype == torch.float32 and e0_B_6_D.dtype == torch.float32
+        # NOTE: Avoid dtype mismatches (e.g., fp32 inputs vs bf16 weights) when running with
+        # CPU offload or quantized checkpoints by aligning embedding dtype/device with the module.
+        _time_param = next(self.time_embedding.parameters())
+        _time_emb = sinusoidal_embedding_1d(self.freq_dim, t_B).to(device=t_B.device, dtype=torch.float32)
+        _time_emb = _time_emb.to(dtype=_time_param.dtype)
+        e_B_D = self.time_embedding(_time_emb)
+        e0_B_6_D = self.time_projection(e_B_D).unflatten(1, (6, self.dim))
 
         # context
         context_lens = None

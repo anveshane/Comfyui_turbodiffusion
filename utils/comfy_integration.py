@@ -128,6 +128,20 @@ class WanVAEWrapper:
         """Get temporal compression factor from wrapped VAE."""
         return self.vae.temporal_compression_factor
 
+    @property
+    def latent_ch(self):
+        """Get latent channel count from wrapped VAE."""
+        return self.vae.latent_ch
+
+    @property
+    def model(self):
+        """Get underlying model for direct access (for tokenizer.model.model.to(device))."""
+        return self.vae.model
+
+    def get_latent_num_frames(self, num_pixel_frames: int) -> int:
+        """Get number of latent frames for given pixel frames."""
+        return self.vae.get_latent_num_frames(num_pixel_frames)
+
     def memory_required(self, input_shape=None):
         """
         Estimate memory required for VAE operations.
@@ -153,6 +167,14 @@ class WanVAEWrapper:
 
     def __repr__(self):
         return f"WanVAEWrapper(vae_name={self.vae_name}, device={self._current_device})"
+
+    def __getattr__(self, name):
+        """Forward any unknown attributes to the underlying VAE."""
+        # Avoid infinite recursion for internal attributes
+        if name in ['vae', 'vae_name', 'device', 'offload_device', '_current_device']:
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        # Forward to underlying VAE
+        return getattr(self.vae, name)
 
 
 def create_comfy_vae(vae_path: Path, vae_name: str):

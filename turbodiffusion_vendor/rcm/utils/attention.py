@@ -144,29 +144,59 @@ def attention(
         if deterministic:
             raise NotImplementedError("Deterministic mode in attention is only supported when Flash Attention 3 is available.")
 
+        # ComfyUI / user environment may runtime-disable SDPA kernels (flash/mem-efficient/cudnn).
+        # Always keep a safe fallback available.
+        if q.device.type == "cuda":
+            try:
+                # These exist on PyTorch 2.x; enable math as the universal fallback.
+                if hasattr(torch.backends.cuda, "enable_math_sdp"):
+                    torch.backends.cuda.enable_math_sdp(True)
+                if hasattr(torch.backends.cuda, "enable_mem_efficient_sdp"):
+                    torch.backends.cuda.enable_mem_efficient_sdp(True)
+            except Exception:
+                pass
+
         # Torch 2.6 and later allows priorities for backends, but for older versions
         # we can only run with a specific backend. As long as we pick ones we're certain
         # will work on that device, it should be fine.
         try:
+            # Always include math as a last resort so we never end up with "No available kernel".
+            if SDPBackend.MATH not in SDPA_BACKENDS:
+                SDPA_BACKENDS = list(SDPA_BACKENDS) + [SDPBackend.MATH]
             sdpa_kernel(backends=SDPA_BACKENDS, set_priority_order=True)
             sdpa_kernel_ = partial(sdpa_kernel, set_priority_order=True)
         except TypeError:
             sdpa_kernel_ = sdpa_kernel
-            SDPA_BACKENDS = [BEST_SDPA_BACKEND]
+            SDPA_BACKENDS = [BEST_SDPA_BACKEND, SDPBackend.MATH]
 
         q = q.transpose(1, 2)
         k = k.transpose(1, 2)
         v = v.transpose(1, 2)
 
-        with sdpa_kernel_(backends=SDPA_BACKENDS):
-            out = torch.nn.functional.scaled_dot_product_attention(
-                q,
-                k,
-                v,
-                is_causal=causal,
-                dropout_p=dropout_p,
-                scale=softmax_scale,
-            )
+        try:
+            with sdpa_kernel_(backends=SDPA_BACKENDS):
+                out = torch.nn.functional.scaled_dot_product_attention(
+                    q,
+                    k,
+                    v,
+                    is_causal=causal,
+                    dropout_p=dropout_p,
+                    scale=softmax_scale,
+                )
+        except RuntimeError as e:
+            # Final safety net: force math SDPA or manual attention.
+            msg = str(e).lower()
+            if "no available kernel" not in msg:
+                raise
+            with sdpa_kernel_(backends=[SDPBackend.MATH]):
+                out = torch.nn.functional.scaled_dot_product_attention(
+                    q,
+                    k,
+                    v,
+                    is_causal=causal,
+                    dropout_p=dropout_p,
+                    scale=softmax_scale,
+                )
 
         out = out.transpose(1, 2).contiguous()
         return out

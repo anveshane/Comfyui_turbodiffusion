@@ -64,6 +64,12 @@ class TurboWanModelLoader:
                     "step": 0.01,
                     "tooltip": "Top-k ratio for sparse attention"
                 }),
+                # IMPORTANT: Keep this LAST for workflow backward-compat. ComfyUI serializes
+                # widget values positionally; inserting a new widget earlier breaks old graphs.
+                "offload_mode": (["comfy_native", "layerwise_gpu", "cpu_only"], {
+                    "default": "comfy_native",
+                    "tooltip": "comfy_native uses ComfyUI's native async weight offloading (pinned RAM, 2 streams). layerwise_gpu swaps blocks to GPU just-in-time (ComfyUI-style). cpu_only runs the whole forward on CPU (slow)."
+                }),
             }
         }
 
@@ -72,7 +78,9 @@ class TurboWanModelLoader:
     CATEGORY = "loaders"
     DESCRIPTION = "Load TurboDiffusion quantized models using official inference code"
 
-    def load_model(self, model_name, attention_type="sla", sla_topk=0.1):
+    # NOTE: default must match INPUT_TYPES default for backwards-compatible workflows
+    # that don't provide `offload_mode` in `widgets_values`.
+    def load_model(self, model_name, attention_type="sla", sla_topk=0.1, offload_mode="comfy_native"):
         """
         Create a lazy loader for TurboDiffusion quantized model.
 
@@ -112,6 +120,7 @@ class TurboWanModelLoader:
                 self.model = "Wan2.2-A14B"
                 self.attention_type = attention_type
                 self.sla_topk = sla_topk
+                self.offload_mode = offload_mode
                 self.quant_linear = True  # Models are quantized
                 self.default_norm = False
 
@@ -195,9 +204,18 @@ class TurboWanModelLoader:
             # Wrap model with CPU offloading if target device is CUDA
             # This allows the model to run even if it doesn't fit entirely in VRAM
             if target_device is not None and str(target_device).startswith('cuda'):
-                from ..utils.cpu_offload_wrapper import CPUOffloadWrapper
-                model = CPUOffloadWrapper(model, target_device)
-                logger.log("Model wrapped with CPU offloading for memory efficiency")
+                if getattr(args, "offload_mode", "layerwise_gpu") == "cpu_only":
+                    from ..utils.cpu_offload_wrapper import CPUOffloadWrapper
+                    model = CPUOffloadWrapper(model, target_device)
+                    logger.log("Model wrapped with CPU-only offloading (very slow)")
+                elif getattr(args, "offload_mode", "layerwise_gpu") == "comfy_native":
+                    from ..utils.comfy_native_offload import ComfyNativeOffloadCallable
+                    model = ComfyNativeOffloadCallable(model, load_device=target_device)
+                    logger.log("Model wrapped with ComfyUI-native async offloading")
+                else:
+                    from ..utils.layerwise_gpu_offload_wrapper import LayerwiseGPUOffloadWrapper
+                    model = LayerwiseGPUOffloadWrapper(model, target_device, empty_cache_every=8)
+                    logger.log("Model wrapped with layerwise GPU offloading (blocks swapped to GPU)")
 
             logger.log(f"✓ Successfully loaded model")
             logger.log(f"Model type: {args.model}")

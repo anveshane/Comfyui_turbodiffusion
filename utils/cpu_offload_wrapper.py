@@ -72,9 +72,17 @@ class CPUOffloadWrapper(nn.Module):
         torch.cuda.empty_cache()
         gc.collect()
 
-        # Move inputs back to CPU for computation
-        args_cpu = tuple(arg.to('cpu') if isinstance(arg, torch.Tensor) else arg for arg in args)
-        kwargs_cpu = {k: v.to('cpu') if isinstance(v, torch.Tensor) else v for k, v in kwargs.items()}
+        # Get model dtype for consistent computation
+        model_dtype = next(self.model.parameters()).dtype
+
+        # Move inputs to CPU and convert to model dtype
+        def convert_tensor(t):
+            if isinstance(t, torch.Tensor):
+                return t.to(device='cpu', dtype=model_dtype)
+            return t
+
+        args_cpu = tuple(convert_tensor(arg) for arg in args)
+        kwargs_cpu = {k: convert_tensor(v) for k, v in kwargs.items()}
 
         # Run forward pass on CPU
         with torch.inference_mode():
