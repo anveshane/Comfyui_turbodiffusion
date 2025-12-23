@@ -482,3 +482,13 @@ class TurboDiffusionI2VSampler:
         print(f"{'='*60}\n")
 
         return (decoded_frames.cpu(),)
+
+
+# Node registration
+NODE_CLASS_MAPPINGS = {
+    "TurboDiffusionI2VSampler": TurboDiffusionI2VSampler
+}
+
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "TurboDiffusionI2VSampler": "TurboDiffusion I2V Sampler"
+}
