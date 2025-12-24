@@ -60,9 +60,9 @@ class TurboDiffusionI2VSampler:
                     "default": 4,
                     "tooltip": "Number of sampling steps (1-4 for distilled model)"
                 }),
-                "resolution": (["480", "480p", "512", "720", "720p"], {
+                "resolution": (["480", "480p", "512", "720", "720p", "custom"], {
                     "default": "480",
-                    "tooltip": "Base resolution (480=480x480, 480p=640x640 for 1:1)"
+                    "tooltip": "Base resolution or custom"
                 }),
                 "aspect_ratio": (["16:9", "9:16", "4:3", "3:4", "1:1"], {
                     "default": "16:9",
@@ -91,6 +91,20 @@ class TurboDiffusionI2VSampler:
                     "default": False,
                     "tooltip": "Use ODE sampling (sharper but less robust)"
                 }),
+                "width": ("INT", {
+                    "default": 480,
+                    "min": 64,
+                    "max": 2048,
+                    "step": 16,
+                    "tooltip": "Custom width (only used when resolution is 'custom')"
+                }),
+                "height": ("INT", {
+                    "default": 480,
+                    "min": 64,
+                    "max": 2048,
+                    "step": 16,
+                    "tooltip": "Custom height (only used when resolution is 'custom')"
+                }),
             }
         }
 
@@ -114,7 +128,9 @@ class TurboDiffusionI2VSampler:
         boundary,
         sigma_max,
         seed,
-        use_ode
+        use_ode,
+        width,
+        height
     ) -> Tuple[torch.Tensor]:
         """
         Run complete TurboDiffusion I2V inference.
@@ -152,7 +168,17 @@ class TurboDiffusionI2VSampler:
         else:
             logger.log(f"CUDA available: No (running on CPU)")
 
-        logger.log(f"Frames: {num_frames}, Steps: {num_steps}, Resolution: {resolution} {aspect_ratio}")
+        # Handle custom resolution
+        if resolution == "custom":
+            # Round to nearest multiple of 16 for compatibility
+            w = int(round(width / 16)) * 16
+            h = int(round(height / 16)) * 16
+
+            logger.log(f"Using custom resolution: {w}x{h}")
+        else:
+            # Get resolution from predefined options
+            w, h = VIDEO_RES_SIZE_INFO[resolution][aspect_ratio]
+            logger.log(f"Frames: {num_frames}, Steps: {num_steps}, Resolution: {resolution} {aspect_ratio}")
         logger.log(f"Boundary: {boundary}, Sigma: {sigma_max}, Seed: {seed}")
 
         # 1. Extract text embedding from conditioning
@@ -192,8 +218,7 @@ class TurboDiffusionI2VSampler:
         image_np = (image[0].cpu().numpy() * 255).astype(np.uint8)
         input_image = Image.fromarray(image_np)
 
-        # Get resolution
-        w, h = VIDEO_RES_SIZE_INFO[resolution][aspect_ratio]
+        # Calculate latent dimensions
         lat_h = h // tokenizer.spatial_compression_factor
         lat_w = w // tokenizer.spatial_compression_factor
         lat_t = tokenizer.get_latent_num_frames(num_frames)
