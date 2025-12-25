@@ -13,10 +13,9 @@ from ..utils.comfy_integration import create_comfy_vae
 try:
     from ..turbodiffusion_vendor.rcm.tokenizers.wan2pt1 import Wan2pt1VAEInterface
     TURBODIFFUSION_AVAILABLE = True
-except ImportError as e:
+except Exception as e:
     TURBODIFFUSION_AVAILABLE = False
-    print(f"ERROR: Could not import Wan2pt1VAEInterface: {e}")
-
+    print(f"[TurboDiffusion] Wan2pt1VAEInterface import failed: {e}")
 
 class TurboWanVAELoader:
     """

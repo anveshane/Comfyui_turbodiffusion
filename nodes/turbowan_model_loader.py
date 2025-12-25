@@ -16,9 +16,9 @@ from pathlib import Path
 # Import from vendored TurboDiffusion code (no external dependency needed!)
 try:
     # First import the vendor package which adds itself to sys.path
-    from .. import turbodiffusion_vendor
-    # Now import from the vendored modules using their absolute paths within vendor dir
-    from inference.modify_model import select_model, replace_attention, replace_linear_norm
+    from ..turbodiffusion_vendor.inference.modify_model import (
+    select_model, replace_attention, replace_linear_norm
+)
     TURBODIFFUSION_AVAILABLE = True
 except ImportError as e:
     TURBODIFFUSION_AVAILABLE = False
@@ -133,8 +133,7 @@ class TurboWanModelLoader:
             load_fn=self._load_model_impl,
             load_args=None  # Will be set below
         )
-
-        # Set load_args with reference to lazy_loader
+        # Pass 3 values to match _load_model_impl unpacking
         lazy_loader.load_args = (args, logger, lazy_loader)
 
         return (lazy_loader,)

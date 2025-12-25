@@ -1,0 +1,143 @@
+不想废话，直接分享我所有的改变动作：
+1.安装依赖：
+```python
+pip install einops loguru omegaconf pandas
+```
+
+2."D:\ComfyUI\ComfyUI\custom_nodes\Comfyui_turbodiffusion\__init__.py"
+原始问题位置（节选）：
+```python
+Repository: https://github.com/anveshane/Comfyui_turbodiffusion
+License: Apache 2.0
+"""
+
+from .nodes.turbowan_sampler import TurboWanSampler
+```
+直接替换为：
+```python
+Repository: https://github.com/anveshane/Comfyui_turbodiffusion
+License: Apache 2.0
+"""
+import os
+import sys
+
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_VENDOR_DIR = os.path.join(_THIS_DIR, "turbodiffusion_vendor")
+
+if _VENDOR_DIR not in sys.path:
+    sys.path.insert(0, _VENDOR_DIR)
+
+from .nodes.turbowan_sampler import TurboWanSampler
+```
+
+3.修改"D:\ComfyUI\ComfyUI\custom_nodes\Comfyui_turbodiffusion\nodes\vae_loader.py"
+原代码：
+```python
+try:
+    from ..turbodiffusion_vendor.rcm.tokenizers.wan2pt1 import Wan2pt1VAEInterface
+    TURBODIFFUSION_AVAILABLE = True
+except ImportError as e:
+    TURBODIFFUSION_AVAILABLE = False
+    print(f"ERROR: Could not import Wan2pt1VAEInterface: {e}")
+```
+改为：
+```python
+try:
+    from rcm.tokenizers.wan2pt1 import Wan2pt1VAEInterface
+    TURBODIFFUSION_AVAILABLE = True
+except Exception as e:
+    TURBODIFFUSION_AVAILABLE = False
+    print(f"[TurboDiffusion] Wan2pt1VAEInterface import failed: {e}")
+```
+
+4.修改"D:\ComfyUI\ComfyUI\custom_nodes\Comfyui_turbodiffusion\nodes\turbowan_model_loader.py"
+原代码：
+```python
+# Import from vendored TurboDiffusion code (no external dependency needed!)
+try:
+    # First import the vendor package which adds itself to sys.path
+    from .. import turbodiffusion_vendor
+    # Now import from the vendored modules using their absolute paths within vendor dir
+    from inference.modify_model import select_model, replace_attention, replace_linear_norm
+    TURBODIFFUSION_AVAILABLE = True
+except ImportError as e:
+    TURBODIFFUSION_AVAILABLE = False
+```
+改为：
+```python
+# Import from vendored TurboDiffusion code (no external dependency needed!)
+try:
+    # First import the vendor package which adds itself to sys.path
+    from ..turbodiffusion_vendor.inference.modify_model import (
+    select_model, replace_attention, replace_linear_norm
+)
+    TURBODIFFUSION_AVAILABLE = True
+except ImportError as e:
+    TURBODIFFUSION_AVAILABLE = False
+```
+
+5.修改
+D:\ComfyUI\ComfyUI\custom_nodes\Comfyui_turbodiffusion\turbodiffusion_vendor\imaginaire\utils\log.py
+原代码：
+```python
+atexit.register(logger.remove)
+
+
+def _add_relative_path(record: dict[str, Any]) -> None:
+    start = os.getcwd()
+    record["extra"]["relative_path"] = os.path.relpath(record["file"].path, start)
+
+
+*options, _, extra = logger._options  # type: ignore
+logger._options = tuple([*options, [_add_relative_path], extra])  # type: ignore
+
+
+def init_loguru_stdout() -> None:
+```
+改为：
+```python
+atexit.register(logger.remove)
+
+# ⚠️ 完全禁用 relative_path 日志 patch
+# 原因：在 TurboDiffusion I2V 推理中会导致显存持续增长
+
+def _add_relative_path(record):
+    return
+
+
+def init_loguru_stdout() -> None:
+```
+
+6.环境说明（关键）：
+最终可稳定运行的环境：
+
+torch-2.8.0+cu128（cp312）
+
+triton-3.2.0
+
+flash_attn-2.8.2 + cu128 + torch2.8
+
+sageattention-2.2.0 + cu128
+
+xformers-0.0.32.post2
+
+在 torch 2.6 / 2.7 下始终无法彻底解决问题。
+
+
+7.关于 __init__.py
+
+网上很多说法不一致：
+
+_init_.py ❌
+
+init.py ❌
+
+__init__.py ✅
+
+实际在 ComfyUI 运行环境 中，
+turbodiffusion_vendor/rcm/ 缺少 __init__.py 会直接导致 import 失败，建议补齐。
+
+8.结论
+
+至此问题解决。
+再有其他问题，我也不清楚了，只能继续折磨 GPT 或其他 AI 了。
