@@ -27,6 +27,13 @@ cd ComfyUI/custom_nodes/
 ```bash
 git clone https://github.com/anveshane/Comfyui_turbodiffusion.git
 ```
+## Dependencies
+
+Please install the required Python dependencies before use:
+
+```bash
+pip install einops loguru omegaconf pandas
+```
 
 3. Restart ComfyUI
 
