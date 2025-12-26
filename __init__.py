@@ -19,6 +19,14 @@ Usage:
 Repository: https://github.com/anveshane/Comfyui_turbodiffusion
 License: Apache 2.0
 """
+import os
+import sys
+
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_VENDOR_DIR = os.path.join(_THIS_DIR, "turbodiffusion_vendor")
+
+if _VENDOR_DIR not in sys.path:
+    sys.path.insert(0, _VENDOR_DIR)
 
 from .nodes.turbowan_sampler import TurboWanSampler
 from .nodes.video_saver import TurboDiffusionSaveVideo

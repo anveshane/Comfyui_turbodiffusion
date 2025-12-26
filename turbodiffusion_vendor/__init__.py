@@ -1,19 +1,17 @@
 """
-Vendored TurboDiffusion code for ComfyUI TurboDiffusion custom node.
+Vendored TurboDiffusion code for ComfyUI.
 
-This package contains essential code from TurboDiffusion (https://github.com/thu-ml/TurboDiffusion)
-to eliminate external dependencies and simplify installation.
-
-License: Apache 2.0 (same as TurboDiffusion)
+DO NOT perform strict path checks here.
+ComfyUI already controls sys.path.
 """
 
-import sys
 import os
+import sys
 
-# Add this directory to sys.path so that turbodiffusion modules can import each other
-# This allows the vendored code to use absolute imports like "from rcm.networks import..."
-_vendor_dir = os.path.dirname(os.path.abspath(__file__))
-if _vendor_dir not in sys.path:
-    sys.path.insert(0, _vendor_dir)
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
-__version__ = "vendored-from-turbodiffusion"
+# Ensure vendor root is importable
+if _THIS_DIR not in sys.path:
+    sys.path.insert(0, _THIS_DIR)
+
+__version__ = "vendored-turbodiffusion"
