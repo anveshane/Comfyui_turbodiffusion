@@ -182,6 +182,19 @@ With SLA attention on RTX 3090:
 
 **"TurboDiffusionI2VSampler" missing**: Ensure all vendored files were copied (turbodiffusion_vendor/)
 
+## Notes on Acceleration Modes
+
+Based on testing on my system (Windows + ComfyUI + NVIDIA GPU), only the following configuration works reliably:
+
+- **Acceleration**: `sla`
+- **Execution mode**: `layerwise_gpu`
+
+Other acceleration options (`original`, `sagesla`) and other execution modes may fail to load or raise runtime errors on my setup.  
+This appears to be related to environment-specific factors (CUDA / PyTorch / driver / VRAM behavior).
+
+Some users may be able to use other modes depending on their hardware and software environment, but on my system only **`sla + layerwise_gpu`** is stable and usable.
+
+
 ## Credits
 
 - [TurboDiffusion](https://github.com/thu-ml/TurboDiffusion) by THU-ML
