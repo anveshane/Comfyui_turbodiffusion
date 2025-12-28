@@ -44,7 +44,7 @@ Download from: [TurboDiffusion Model](https://huggingface.co/TurboDiffusion/Turb
 - `wan_2.1_vae.safetensors` (or `.pth`)
 
 ### 3. Text Encoder (`ComfyUI/models/clip/` or `text_encoders/`)
-- `nsfw_wan_umt5-xxl_fp8_scaled.safetensors` (or `.pth`)
+- `umt5-xxl_fp8_scaled.safetensors` (or `.pth`)
 
 ## Workflow
 
