@@ -39,15 +39,23 @@ logger = Logger(
 
 atexit.register(logger.remove)
 
+# ⚠️ 完全禁用 relative_path 日志 patch
+# 原因：在 TurboDiffusion I2V 推理中会导致显存持续增长
 
-def _add_relative_path(record: dict[str, Any]) -> None:
-    start = os.getcwd()
-    record["extra"]["relative_path"] = os.path.relpath(record["file"].path, start)
+def _add_relative_path(record):
+    return
 
 
-*options, _, extra = logger._options  # type: ignore
-logger._options = tuple([*options, [_add_relative_path], extra])  # type: ignore
-
+def init_loguru_stdout() -> None:
+    logger.remove()
+    machine_format = get_machine_format()
+    message_format = get_message_format()
+    logger.add(
+        sys.stdout,
+        level=LEVEL,
+        format=f"[<green>{{time:MM-DD HH:mm:ss}}</green>|{machine_format}{message_format}",
+        filter=_rank0_only_filter,
+    )
 
 def init_loguru_stdout() -> None:
     logger.remove()
